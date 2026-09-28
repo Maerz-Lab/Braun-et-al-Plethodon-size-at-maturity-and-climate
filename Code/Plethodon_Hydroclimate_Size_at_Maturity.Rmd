@@ -11,11 +11,6 @@ Loading libraries (Uncomment to install)
 library(tidyverse)
 library(ggeffects)
 library(patchwork)
-
-## Below is for Site as a Random (THE IMPORTANT NOTE PART)
-# install.packages("lmerTest")
-library(lmerTest)
-
 ```
 
 Reading files
@@ -29,7 +24,7 @@ Filtering to mature Plethodon
 # Keeps mature males and females with SVL from 40 to 120 mm
 all_mature_plethodon <- Plethodon_data %>%
   filter(maturity_status %in% c("mature_male", "mature_female"),
-         between(svl_mm, 40, 120)) %>%
+         between(svl_mm, 30, 120)) %>%
   select(site, species, svl_mm, maturity_status)
 ```
 
@@ -218,3 +213,5 @@ Session information
 # Records the R and package versions used
 sessionInfo()
 ```
+
+
