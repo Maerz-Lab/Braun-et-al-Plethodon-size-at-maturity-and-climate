@@ -1,0 +1,220 @@
+---
+title: "Plethodon_Hydroclimate_Size_at_Maturity"
+author: "N/A"
+date: "2026-09-21"
+output: html_document
+---
+
+Loading libraries (Uncomment to install)
+```{r, message = FALSE}
+# install.packages(c("tidyverse", "ggeffects", "patchwork"))
+library(tidyverse)
+library(ggeffects)
+library(patchwork)
+
+## Below is for Site as a Random (THE IMPORTANT NOTE PART)
+# install.packages("lmerTest")
+library(lmerTest)
+
+```
+
+Reading files
+```{r}
+Plethodon_data <- read.csv('../Inputs/Plethodon_Data.csv')
+Plethodon_Study_Sites <- read.csv('../Inputs/Salamander_Study_Sites.csv')
+```
+
+Filtering to mature Plethodon
+```{r}
+# Keeps mature males and females with SVL from 40 to 120 mm
+all_mature_plethodon <- Plethodon_data %>%
+  filter(maturity_status %in% c("mature_male", "mature_female"),
+         between(svl_mm, 40, 120)) %>%
+  select(site, species, svl_mm, maturity_status)
+```
+
+Minimum SVL per site and sex, combined with site environmental data
+```{r}
+# Smallest mature SVL per site and sex
+Plethodon_sites_simplified <- all_mature_plethodon %>%
+  group_by(site, maturity_status) %>%
+  summarise(svl_mm = min(svl_mm), .groups = "drop") %>%
+  mutate(sex = if_else(maturity_status == "mature_male", "male", "female"))
+
+# Keeps only sites with measured mature individuals
+Modeling_Data <- Plethodon_Study_Sites %>%
+  inner_join(Plethodon_sites_simplified, by = "site", relationship = "one-to-many")
+```
+
+Prepping the Plethodon data for modeling
+```{r}
+# Standardizes each site once
+scale_by_site <- function(x, site) {
+  once <- !duplicated(site)
+  (x - mean(x[once])) / sd(x[once])
+}
+
+Modeling_Data <- Modeling_Data %>%
+  mutate(
+    # Folds aspect so 0 = north-facing and 180 = south-facing
+    Aspect_folded = 180 - abs(Aspect - 180),
+
+    # Standardizes the covariates
+    MDT_z    = scale_by_site(DaymetMDTC.Apr.Oct.2011.2020, site),
+    MDP_z    = scale_by_site(DaymetMDPmm.Apr.Oct.2011.2020, site),
+    MDVPD_z  = scale_by_site(DaymetMDVPD.Apr.Oct.2011.2020, site),
+    Aspect_z = scale_by_site(Aspect_folded, site),
+    Slope_z  = scale_by_site(Slope, site),
+
+    # Sets male as the reference level
+    sex = relevel(factor(sex), ref = "male"))
+```
+
+Linear model for Coweeta
+```{r}
+# Subsetting data to only Coweeta
+Coweeta_Modeling_data <- Modeling_Data %>%
+  filter(Study.Area == "Coweeta")
+
+# Linear Model
+Coweeta_Model <- glm(svl_mm ~ sex + MDVPD_z + Slope_z + Aspect_z + MDP_z + MDT_z, data = Coweeta_Modeling_data)
+
+# Model summary
+summary(Coweeta_Model)
+```
+
+Linear model for regional dataset
+```{r}
+# Linear Model
+All_Sites_Model <- glm(svl_mm ~ sex + MDVPD_z + Slope_z + Aspect_z + MDP_z + MDT_z, data = Modeling_Data)
+
+# Model summary
+summary(All_Sites_Model)
+```
+
+Plotting
+Back-transforming values for plotting
+```{r}
+# One row per site, matching how the covariates were standardized
+Site_Data <- Modeling_Data %>%
+  distinct(site, .keep_all = TRUE)
+
+# Back-transformation values
+MDVPD_mean <- mean(Site_Data$DaymetMDVPD.Apr.Oct.2011.2020)
+MDVPD_sd   <- sd(Site_Data$DaymetMDVPD.Apr.Oct.2011.2020)
+
+Slope_mean <- mean(Site_Data$Slope)
+Slope_sd   <- sd(Site_Data$Slope)
+```
+
+Generating prediction objects
+```{r}
+# Coweeta predictions
+# MDVPD
+MDVPD_pred_coweeta <- ggpredict(Coweeta_Model, terms = c("MDVPD_z", "sex"))
+MDVPD_pred_coweeta$MDVPD <- MDVPD_pred_coweeta$x * MDVPD_sd + MDVPD_mean
+
+# Slope
+Slope_pred_coweeta <- ggpredict(Coweeta_Model, terms = c("Slope_z", "sex"))
+Slope_pred_coweeta$Slope <- Slope_pred_coweeta$x * Slope_sd + Slope_mean
+
+# All site predictions
+# MDVPD
+MDVPD_pred_all_sites <- ggpredict(All_Sites_Model, terms = c("MDVPD_z", "sex"))
+MDVPD_pred_all_sites$MDVPD <- MDVPD_pred_all_sites$x * MDVPD_sd + MDVPD_mean
+
+# Slope
+Slope_pred_all_sites <- ggpredict(All_Sites_Model, terms = c("Slope_z", "sex"))
+Slope_pred_all_sites$Slope <- Slope_pred_all_sites$x * Slope_sd + Slope_mean
+```
+
+Calculating shared limits
+```{r}
+# Both MDVPD plots begin and end with the Coweeta prediction range for comparison of the Coweeta plot to the broader regional plot.
+MDVPD_limits <- range(MDVPD_pred_coweeta$MDVPD)
+
+# Both slope plots cover the combined Coweeta and all-sites range
+Slope_limits <- range(Slope_pred_coweeta$Slope, Slope_pred_all_sites$Slope)
+
+# All four plots share one SVL axis that fits every confidence interval
+SVL_limits <- range(
+  MDVPD_pred_coweeta$conf.low,   MDVPD_pred_coweeta$conf.high,
+  Slope_pred_coweeta$conf.low,   Slope_pred_coweeta$conf.high,
+  MDVPD_pred_all_sites$conf.low, MDVPD_pred_all_sites$conf.high,
+  Slope_pred_all_sites$conf.low, Slope_pred_all_sites$conf.high)
+
+# Adding some space above and below the confidence intervals
+SVL_padding <- diff(SVL_limits) * 0.05
+SVL_limits <- c(SVL_limits[1] - SVL_padding, SVL_limits[2] + SVL_padding)
+```
+
+Coweeta MDVPD plot
+```{r}
+Coweeta_MDVPD_Plot <- ggplot(MDVPD_pred_coweeta, aes(x = MDVPD, y = predicted, color = group, fill = group)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2, color = NA) +
+  geom_line(linewidth = 1.2) +
+  coord_cartesian(xlim = MDVPD_limits, ylim = SVL_limits) +
+  labs(title = "Coweeta", x = "MDVPD", y = "Predicted min SVL (mm)",
+       color = "Sex", fill = "Sex", tag = "A") +
+  theme_classic() +
+  theme(legend.position = "none")
+```
+
+Coweeta slope plot
+```{r}
+Coweeta_Slope_Plot <- ggplot(Slope_pred_coweeta, aes(x = Slope, y = predicted, color = group, fill = group)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2, color = NA) +
+  geom_line(linewidth = 1.2) +
+  coord_cartesian(xlim = Slope_limits, ylim = SVL_limits) +
+  labs(title = "Coweeta", x = "Slope", y = NULL,
+       color = "Sex", fill = "Sex", tag = "B") +
+  theme_classic() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "none")
+```
+
+All sites MDVPD plot
+```{r}
+All_Sites_MDVPD_Plot <- ggplot(MDVPD_pred_all_sites, aes(x = MDVPD, y = predicted, color = group, fill = group)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2, color = NA) +
+  geom_line(linewidth = 1.2) +
+  coord_cartesian(xlim = MDVPD_limits, ylim = SVL_limits) +
+  labs(title = "All sites", x = "MDVPD", y = "Predicted min SVL (mm)",
+       color = "Sex", fill = "Sex", tag = "C") +
+  theme_classic() +
+  theme(legend.position = "none")
+```
+
+All sites slope plot
+```{r}
+All_Sites_Slope_Plot <- ggplot(Slope_pred_all_sites, aes(x = Slope, y = predicted, color = group, fill = group)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2, color = NA) +
+  geom_line(linewidth = 1.2) +
+  coord_cartesian(xlim = Slope_limits, ylim = SVL_limits) +
+  labs(title = "All sites", x = "Slope", y = NULL,
+       color = "Sex", fill = "Sex", tag = "D") +
+  theme_classic() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+```
+
+Combine all four plots into one for comparison
+```{r}
+# Coweeta plots on the top row, all-sites plots on the bottom row, shared legend above
+Combined_Covariate_Plot <- (
+  guide_area() /
+    (Coweeta_MDVPD_Plot | Coweeta_Slope_Plot) /
+    (All_Sites_MDVPD_Plot | All_Sites_Slope_Plot)) +
+  plot_layout(heights = c(0.10, 1, 1), guides = "collect") &
+  theme(legend.position = "top")
+
+Combined_Covariate_Plot
+
+# Saves the combined plot, creating the Outputs folder if it doesn't exist
+dir.create("../Outputs", showWarnings = FALSE)
+ggsave("../Outputs/combined_MDVPD_Slope_plot.pdf", plot = Combined_Covariate_Plot, width = 14, height = 9, units = "in")
+```
+
+Session information
+```{r}
+# Records the R and package versions used
+sessionInfo()
+```
