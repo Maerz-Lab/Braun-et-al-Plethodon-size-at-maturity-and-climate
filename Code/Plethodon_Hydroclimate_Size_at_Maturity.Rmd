@@ -20,8 +20,8 @@ library(lmerTest)
 
 Reading files
 ```{r}
-Plethodon_data <- read.csv('../Inputs/Plethodon_Data.csv')
-Plethodon_Study_Sites <- read.csv('../Inputs/Salamander_Study_Sites.csv')
+Plethodon_data <- read.csv('../Input/Plethodon_Data.csv')
+Plethodon_Study_Sites <- read.csv('../Input/Salamander_Study_Sites.csv')
 ```
 
 Filtering to mature Plethodon
