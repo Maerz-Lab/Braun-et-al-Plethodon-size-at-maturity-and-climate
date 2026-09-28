@@ -9,7 +9,7 @@ CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
 N/A
 
 3. Recommended citation for this data/code archive
-Will include after review. ???
+Will include after review. 
 
 DATA & CODE FILE OVERVIEW
 This data repository consist of 2 data files, 1 code scripts, and this README document, with the following data and code filenames and variables. 
