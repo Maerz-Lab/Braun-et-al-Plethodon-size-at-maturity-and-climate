@@ -75,7 +75,8 @@ Coweeta_Modeling_data <- Modeling_Data %>%
 # Linear Model
 Coweeta_Model <- glm(svl_mm ~ sex + MDVPD_z + Slope_z + Aspect_z + MDP_z + MDT_z, data = Coweeta_Modeling_data)
 
-# Model summary
+# Model summary 
+# This produces two-tailed p-values; these were then calculated as one-tailed p-values and reported as such in the manuscript. 
 summary(Coweeta_Model)
 ```
 
@@ -85,6 +86,7 @@ Linear model for regional dataset
 All_Sites_Model <- glm(svl_mm ~ sex + MDVPD_z + Slope_z + Aspect_z + MDP_z + MDT_z, data = Modeling_Data)
 
 # Model summary
+# This produces two-tailed p-values; these were then calculated as one-tailed p-values and reported as such in the manuscript. 
 summary(All_Sites_Model)
 ```
 
@@ -214,5 +216,4 @@ Session information
 # Records the R and package versions used
 sessionInfo()
 ```
-
 
