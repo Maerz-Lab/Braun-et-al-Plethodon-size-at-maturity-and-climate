@@ -6,7 +6,7 @@ output: html_document
 ---
 
 Loading libraries (Uncomment to install)
-```{r, message = FALSE}
+```{r, warning = FALSE, message = FALSE}
 # install.packages(c("tidyverse", "ggeffects", "patchwork"))
 library(tidyverse)
 library(ggeffects)
@@ -21,7 +21,8 @@ Plethodon_Study_Sites <- read.csv('../Input/Salamander_Study_Sites.csv')
 
 Filtering to mature Plethodon
 ```{r}
-# Keeps mature males and females with SVL from 40 to 120 mm
+# Keeps mature males and females
+# Excludes those with measurements below 30 and above 120 because these are likely measurement errors
 all_mature_plethodon <- Plethodon_data %>%
   filter(maturity_status %in% c("mature_male", "mature_female"),
          between(svl_mm, 30, 120)) %>%
