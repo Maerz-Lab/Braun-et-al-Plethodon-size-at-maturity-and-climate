@@ -3,13 +3,13 @@ Ommitted for double-blind review but will include on final acceptance.
 
 ACCESS INFORMATION
 1. Licenses/restrictions placed onthe data or code
-CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+There are no restrictions place on this data or code. 
 
 2. Data derived from other sources
 N/A
 
 3. Recommended citation for this data/code archive
-Will include after review. 
+Because author names are listed, will include after initial review. 
 
 DATA & CODE FILE OVERVIEW
 This data repository consist of 2 data files, 1 code scripts, and this README document, with the following data and code filenames and variables. 
